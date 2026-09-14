@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuizStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+}
+
+model User {
+  id             String    @id @default(uuid())
+  firstName      String
+  lastName       String
+  email          String    @unique
+  passwordHash   String
+  role           Role      @default(STUDENT)
+  isVerified     Boolean   @default(false)
+  lastActiveAt   DateTime?
+  joinedAt       DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  emailVerificationToken EmailVerificationToken?
+  forgotPasswordToken    ForgotPasswordToken?
+  profileImage           UserProfileImage?
+
+  quizzesCreated Quiz[]        @relation("QuizCreatedBy")
+  quizResults    QuizResult[]
+
+  @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ForgotPasswordToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserProfileImage {
+  id        String   @id @default(uuid())
+  url       String
+  publicId  String
+  mimeType  String
+  format    String
+  size      Int
+  createdAt DateTime @default(now())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("userProfileImage")
+}
+
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  quizzes Quiz[]
+
+  @@map("category")
+}
+
+model Quiz {
+  id                String     @id @default(uuid())
+  title             String
+  description       String?
+  difficulty        Difficulty
+  numberOfQuestions Int
+  startTime         DateTime
+  endTime           DateTime
+  status            QuizStatus @default(DRAFT)
+  createdAt         DateTime   @default(now())
+
+  userId     String
+  createdBy  User   @relation("QuizCreatedBy", fields: [userId], references: [id])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  questions   Question[]
+  quizResults QuizResult[]
+
+  @@map("quiz")
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  text          String
+  type          QuestionType
+  options       String[]
+  correctAnswer String
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("question")
+}
+
+model QuizResult {
+  id         String @id @default(uuid())
+  finalScore Int
+  rank       Int
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@map("quiz_results")
+}
