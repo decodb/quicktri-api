@@ -11,6 +11,7 @@ export class MailService {
 
   private readonly subjectMap: Record<MailTemplate, string> = {
     [MailTemplate.EMAIL_VERIFICATION]: 'Verify your email address',
+    [MailTemplate.FORGOT_PASSWORD]: 'Reset your password',
   };
 
   constructor(private config: ConfigService) {
