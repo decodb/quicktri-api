@@ -3,6 +3,8 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { SignUpDto } from './dto/signup.dto';
@@ -13,6 +15,9 @@ import { MailService } from 'src/core/mail/mail.service';
 import { MailTemplate } from 'src/core/mail/mail.types';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SignInDto } from './dto/signin.dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './types/jwt.types.dto';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +27,7 @@ export class AuthService {
     private prisma: PrismaService,
     private config: ConfigService,
     private mail: MailService,
+    private jwtService: JwtService,
   ) {}
 
   async signUp(dto: SignUpDto) {
@@ -235,5 +241,62 @@ export class AuthService {
     }
 
     return { message: 'Password successfully changed.' };
+  }
+
+  async signIn(dto: SignInDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!existingUser) {
+      throw new NotFoundException('Invalid credentials. ');
+    }
+
+    if (!existingUser.isVerified) {
+      throw new UnauthorizedException('Please verify your email to login. ');
+    }
+
+    const passwordsMatch = await bcrypt.compare(
+      dto.password,
+      existingUser.passwordHash,
+    );
+
+    if (!passwordsMatch) {
+      throw new UnauthorizedException('Invalid credentials.');
+    }
+
+    const { id, email, role } = existingUser;
+
+    const { accessToken, refreshToken } = this.generateTokens({
+      sub: Number(id),
+      email,
+      role,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  private generateTokens(payload: JwtPayload) {
+    return {
+      accessToken: this.generateAccessToken(payload),
+      refreshToken: this.generateRefreshToken(payload),
+    };
+  }
+
+  private generateAccessToken(payload: JwtPayload): string {
+    return this.jwtService.sign(payload, {
+      secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.getOrThrow<number>('JWT_ACCESS_TTL'),
+    });
+  }
+
+  private generateRefreshToken(payload: JwtPayload): string {
+    return this.jwtService.sign(
+      { sub: payload.sub },
+      {
+        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.config.getOrThrow<number>('JWT_REFRESH_TTL'),
+      },
+    );
   }
 }
