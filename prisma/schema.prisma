@@ -50,6 +50,7 @@ model User {
 
   emailVerificationToken EmailVerificationToken?
   forgotPasswordToken    ForgotPasswordToken?
+  refreshToken RefreshToken? 
   profileImage           UserProfileImage?
 
   quizzesCreated Quiz[]        @relation("QuizCreatedBy")
@@ -80,6 +81,21 @@ model ForgotPasswordToken {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// schema.prisma
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String 
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserProfileImage {

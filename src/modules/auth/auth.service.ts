@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
@@ -249,7 +248,7 @@ export class AuthService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException('Invalid credentials. ');
+      throw new UnauthorizedException('Invalid credentials.');
     }
 
     if (!existingUser.isVerified) {
@@ -268,9 +267,26 @@ export class AuthService {
     const { id, email, role } = existingUser;
 
     const { accessToken, refreshToken } = this.generateTokens({
-      sub: Number(id),
+      sub: id,
       email,
       role,
+    });
+
+    const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+
+    await this.prisma.refreshToken.upsert({
+      where: { userId: id },
+      update: {
+        tokenHash: tokenHash,
+        revoked: false,
+        expiresAt: newExpiry,
+      },
+      create: {
+        userId: id,
+        tokenHash: tokenHash,
+        expiresAt: newExpiry,
+      },
     });
 
     return { accessToken, refreshToken };
