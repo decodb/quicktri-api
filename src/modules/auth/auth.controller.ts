@@ -22,7 +22,7 @@ export class AuthController {
     private config: ConfigService,
   ) {}
   @Post('sign-up')
-  signUp(@Body() dto: SignUpDto): Promise<{ email }> {
+  signUp(@Body() dto: SignUpDto): Promise<{ email: string }> {
     return this.authService.signUp(dto);
   }
 
